@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Youth Points Tracker</title>
+    <!-- Tailwind CSS & Google Fonts for clean styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Fredoka', sans-serif; background-color: #F4F5F1; }
+    </style>
+</head>
+<body class="min-h-screen text-[#1B2421] pb-24">
+
+    <!-- PASSWORD LOGIN GATE -->
+    <div id="login-screen" class="fixed inset-0 bg-[#F4F5F1] z-50 flex flex-col items-center justify-center p-6">
+        <div class="bg-white p-8 rounded-3xl shadow-md w-full max-w-sm text-center">
+            <h1 class="text-2xl text-[#164E49] font-bold mb-2">Youth Points Log In</h1>
+            <p class="text-xs text-gray-500 mb-6">Enter password to access tracking</p>
+            <input id="password-input" type="password" inputmode="numeric" placeholder="Enter Password" class="w-full bg-[#F1F2F0] rounded-2xl px-4 py-3 mb-4 text-center text-xl tracking-widest focus:outline-none focus:ring-2 focus:ring-[#164E49]">
+            <button onclick="checkPassword()" class="w-full text-white bg-[#164E49] font-semibold rounded-2xl py-3 active:scale-95 transition-transform">Enter</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP SCREEN (HIDDEN BY DEFAULT) -->
+    <div id="app-screen" class="hidden max-w-md mx-auto">
+        <!-- Header -->
+        <div class="bg-[#164E49] text-white rounded-b-3xl px-5 pb-6 pt-8 shadow-md">
+            <h1 class="text-2xl font-bold">Youth Points</h1>
+            <p id="member-count" class="text-sm text-[#9FC4BF] mt-0.5">0 people tracked</p>
+            <input id="search-input" oninput="filterDropdownAndList()" type="text" placeholder="Search names..." class="w-full mt-4 rounded-2xl px-4 py-3 text-sm text-[#1B2421] focus:outline-none">
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex justify-around my-4 px-4">
+            <button onclick="switchTab('tracker')" id="tab-tracker" class="font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49]">Points</button>
+            <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="font-bold border-b-2 border-transparent pb-1 text-gray-400">Leaderboard</button>
+            <button onclick="switchTab('add')" id="tab-add" class="font-bold border-b-2 border-transparent pb-1 text-gray-400">Add Student</button>
+        </div>
+
+        <!-- Tab Content 1: Points Tracker -->
+        <div id="content-tracker" class="px-5 space-y-2">
+            <select id="student-dropdown" onchange="selectStudent()" class="w-full bg-white border border-gray-200 rounded-2xl p-4 font-medium focus:outline-none shadow-sm"></select>
+            
+            <div id="points-display-card" class="bg-white rounded-3xl p-6 shadow-sm text-center my-4 hidden">
+                <span id="selected-student-name" class="block text-gray-500 text-sm font-medium mb-1">Select a student</span>
+                <div class="w-28 h-28 mx-auto bg-[#F5E6C8] border-2 border-[#C9962E] rounded-full flex flex-col items-center justify-center">
+                    <span id="selected-student-pts" class="text-2xl font-bold text-[#8A6415]">0</span>
+                    <span class="text-xs text-[#8A6415]">points</span>
+                </div>
+                
+                <!-- Add / Subtract Toggle -->
+                <div class="flex bg-[#F1F2F0] p-1 rounded-2xl my-4">
+                    <button id="btn-mode-add" onclick="setMode('add')" class="flex-1 py-2 rounded-xl text-sm font-semibold bg-[#3F9142] text-white">Add</button>
+                    <button id="btn-mode-sub" onclick="setMode('subtract')" class="flex-1 py-2 rounded-xl text-sm font-semibold text-gray-400">Subtract</button>
+                </div>
+
+                <!-- Preset Buttons -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="adjustPoints(10)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+10</button>
+                    <button onclick="adjustPoints(25)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+25</button>
+                    <button onclick="adjustPoints(50)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+50</button>
+                    <button onclick="adjustPoints(100)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+100</button>
+                    <button onclick="adjustPoints(150)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+150</button>
+                    <button onclick="toggleCustom()" class="bg-[#F1F2F0] text-gray-500 py-3 rounded-xl font-bold text-sm">Custom</button>
+                </div>
+
+                <!-- Custom Input -->
+                <div id="custom-input-div" class="hidden mt-3 flex gap-2">
+                    <input id="custom-amount" type="number" placeholder="Amount" class="flex-1 bg-[#F1F2F0] rounded-xl px-4 py-2 text-center focus:outline-none">
+                    <button onclick="applyCustomPoints()" class="bg-[#3F9142] text-white px-6 rounded-xl font-semibold">Apply</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content 2: Leaderboard -->
+        <div id="content-leaderboard" class="hidden px-5 space-y-2"></div>
+
+        <!-- Tab Content 3: Add Student -->
+        <div id="content-add" class="hidden px-5">
+            <div class="bg-white p-5 rounded-3xl shadow-sm">
+                <h3 class="font-bold mb-3">Add New Student</h3>
+                <input id="new-student-name" type="text" placeholder="Full Name" class="w-full bg-[#F1F2F0] rounded-2xl px-4 py-3 mb-3 focus:outline-none">
+                <button onclick="addNewStudent()" class="w-full bg-[#164E49] text-white font-semibold py-3 rounded-2xl">Add Student</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 text-sm px-4 py-2 rounded-full shadow-lg bg-[#1B2421] text-white hidden z-50"></div>
+
+    <script>
+        // Connected directly to your Supabase Cloud Database!
+        const SUPABASE_URL = "https://kotfrrazrzjyruvszzyi.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdGZycmF6cnpqeXJ1dnN6enlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNzM5MDEsImV4cCI6MjA5OTY0OTkwMX0.HiqMM4EyJMEL-umLe2N_c89_L9Ws5nfb5nl6BGU_c7Q";
+
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let students = [];
+        let selectedId = null;
+        let mode = 'add'; // 'add' or 'subtract'
+
+        // 1. Password Protection
+        function checkPassword() {
+            const pwd = document.getElementById('password-input').value;
+            if (pwd === "1914") {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                fetchData();
+            } else {
+                alert("Incorrect Password!");
+            }
+        }
+
+        // 2. Fetch Data from Supabase Cloud
+        async function fetchData() {
+            const { data, error } = await supabase
+                .from('students')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (!error && data) {
+                students = data;
+                document.getElementById('member-count').innerText = `${students.length} ${students.length === 1 ? 'person' : 'people'} tracked`;
+                populateDropdown(students);
+            }
+        }
+
+        // 3. Tab Navigation
+        function switchTab(tab) {
+            ['tracker', 'leaderboard', 'add'].forEach(t => {
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).className = "font-bold border-b-2 border-transparent pb-1 text-gray-400";
+            });
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49]";
+            if (tab === 'leaderboard') renderLeaderboard();
+        }
+
+        // 4. Dropdown Handling
+        function populateDropdown(listToRender) {
+            const dropdown = document.getElementById('student-dropdown');
+            dropdown.innerHTML = `<option value="">-- Select a Student --</option>`;
+            listToRender.forEach(s => {
+                dropdown.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+            if (selectedId) {
+                dropdown.value = selectedId;
+                selectStudent();
+            }
+        }
+
+        function filterDropdownAndList() {
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const filtered = students.filter(s => s.name.toLowerCase().includes(searchVal));
+            populateDropdown(filtered);
+        }
+
+        function selectStudent() {
+            selectedId = parseInt(document.getElementById('student-dropdown').value);
+            const card = document.getElementById('points-display-card');
+            if (!selectedId) {
+                card.classList.add('hidden');
+                return;
+            }
+            const student = students.find(s => s.id === selectedId);
+            document.getElementById('selected-student-name').innerText = student.name;
+            document.getElementById('selected-student-pts').innerText = student.points.toLocaleString();
+            card.classList.remove('hidden');
+        }
+
+        // 5. Add / Subtract Point Logic
+        function setMode(newMode) {
+            mode = newMode;
+            const isAdd = mode === 'add';
+            document.getElementById('btn-mode-add').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${isAdd ? 'bg-[#3F9142] text-white' : 'text-gray-400'}`;
+            document.getElementById('btn-mode-sub').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${!isAdd ? 'bg-[#C1543C] text-white' : 'text-gray-400'}`;
+            
+            // Update preset button prefixes
+            document.querySelectorAll('.preset-btn').forEach((btn, index) => {
+                const values = [10, 25, 50, 100, 150];
+                btn.innerText = `${isAdd ? '+' : '-'}${values[index]}`;
+                btn.className = isAdd 
+                    ? 'preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform' 
+                    : 'preset-btn bg-[#FBEAE6] text-[#93402E] py-3 rounded-xl font-bold active:scale-95 transition-transform';
+            });
+        }
+
+        async function adjustPoints(amount) {
+            if (!selectedId) return;
+            const student = students.find(s => s.id === selectedId);
+            const delta = mode === 'add' ? amount : -amount;
+            const newPoints = Math.max(0, student.points + delta);
+
+            const { error } = await supabase
+                .from('students')
+                .update({ points: newPoints })
+                .eq('id', selectedId);
+
+            if (!error) {
+                showToast(`${mode === 'add' ? '+' : '-'}${amount} points applied to ${student.name}`);
+                fetchData();
+            }
+        }
+
+        // Custom Points Toggle
+        function toggleCustom() {
+            const div = document.getElementById('custom-input-div');
+            div.classList.toggle('hidden');
+        }
+
+        async function applyCustomPoints() {
+            const amountInput = document.getElementById('custom-amount');
+            const val = parseInt(amountInput.value);
+            if (!val || val <= 0) return;
+            await adjustPoints(val);
+            amountInput.value = '';
+            document.getElementById('custom-input-div').classList.add('hidden');
+        }
+
+        // 6. Add New Student
+        async function addNewStudent() {
+            const nameInput = document.getElementById('new-student-name');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            const { error } = await supabase
+                .from('students')
+                .insert([{ name, points: 0 }]);
+
+            if (!error) {
+                showToast(`${name} registered!`);
+                nameInput.value = '';
+                fetchData();
+                switchTab('tracker');
+            } else {
+                alert("Student already exists or database error.");
+            }
+        }
+
+        // 7. Render Leaderboard List
+        function renderLeaderboard() {
+            const container = document.getElementById('content-leaderboard');
+            container.innerHTML = '';
+            const sorted = [...students].sort((a, b) => b.points - a.points);
+            
+            sorted.forEach((s, i) => {
+                container.innerHTML += `
+                    <div class="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-[#164E49] w-6">#${i + 1}</span>
+                            <span class="font-medium">${s.name}</span>
+                        </div>
+                        <span class="bg-[#F5E6C8] text-[#8A6415] rounded-full px-3 py-1 text-xs font-bold">${s.points.toLocaleString()} pts</span>
+                    </div>
+                `;
+            });
+        }
+
+        // Toast Helper
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2000);
+        }
+    </script>
+</body>
+</html>
