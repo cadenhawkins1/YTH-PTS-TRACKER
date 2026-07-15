@@ -1,55 +1,89 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Youth Points Tracker</title>
+    <!-- Tailwind CSS & Google Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght=500;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Fredoka', sans-serif; background-color: #F4F5F1; }
     </style>
 </head>
 <body class="min-h-screen text-[#1B2421] pb-24">
 
-    <div class="max-w-md mx-auto">
+    <!-- MAIN APP SCREEN -->
+    <div id="app-screen" class="max-w-md mx-auto relative min-h-screen pb-32">
         <!-- Header -->
         <div class="bg-[#164E49] text-white rounded-b-3xl px-5 pb-6 pt-8 shadow-md">
             <h1 class="text-2xl font-bold">Youth Points</h1>
-            <p id="member-count" class="text-sm text-[#9FC4BF] mt-0.5">Local Standalone Mode</p>
+            <p id="member-count" class="text-sm text-[#9FC4BF] mt-0.5">0 people tracked</p>
+            <!-- Search Bar -->
+            <input id="search-input" oninput="renderStudentList()" type="text" placeholder="Search names..." class="w-full mt-4 rounded-2xl px-4 py-3 text-sm text-[#1B2421] focus:outline-none">
         </div>
 
-        <!-- Navigation Tabs (Guaranteed click handlers) -->
+        <!-- Navigation Tabs -->
         <div class="flex justify-around my-4 px-4 bg-white py-2 shadow-sm rounded-xl mx-2">
             <button onclick="switchTab('tracker')" id="tab-tracker" class="font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer">Points</button>
             <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer">Leaderboard</button>
             <button onclick="switchTab('add')" id="tab-add" class="font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer">Add Student</button>
         </div>
 
-        <!-- Tab 1: Points Tracker -->
-        <div id="content-tracker" class="px-5 space-y-4">
-            <div class="bg-white p-6 rounded-3xl shadow-sm text-center">
-                <p class="text-gray-500 mb-2">Select a student from the list:</p>
-                <select id="student-dropdown" class="w-full bg-[#F1F2F0] rounded-xl p-3 font-medium focus:outline-none">
-                    <option value="">-- No Students Registered Yet --</option>
-                </select>
-                <p class="text-xs text-gray-400 mt-4">Go to the "Add Student" tab above to create one!</p>
+        <!-- Tab Content 1: Alphabetical Student List -->
+        <div id="content-tracker" class="px-5 space-y-2">
+            <div id="alphabetical-student-list" class="space-y-2">
+                <!-- Students inject here alphabetically -->
             </div>
         </div>
 
-        <!-- Tab 2: Leaderboard -->
-        <div id="content-leaderboard" class="hidden px-5 space-y-2">
-            <div class="bg-white p-6 rounded-3xl shadow-sm text-center">
-                <p class="text-gray-500">Leaderboard updates instantly when students are added.</p>
-            </div>
-        </div>
+        <!-- Tab Content 2: Leaderboard -->
+        <div id="content-leaderboard" class="hidden px-5 space-y-2"></div>
 
-        <!-- Tab 3: Add Student -->
+        <!-- Tab Content 3: Add Student -->
         <div id="content-add" class="hidden px-5">
             <div class="bg-white p-5 rounded-3xl shadow-sm">
                 <h3 class="font-bold mb-3 text-lg">Add New Student</h3>
-                <input id="new-student-name" type="text" placeholder="Type student name here..." class="w-full bg-[#F1F2F0] rounded-2xl px-4 py-3 mb-4 focus:outline-none border border-transparent focus:border-[#164E49]">
+                <input id="new-student-name" type="text" placeholder="Type student name here..." class="w-full bg-[#F1F2F0] rounded-2xl px-4 py-3 mb-4 focus:outline-none">
                 <button onclick="addNewStudent()" class="w-full bg-[#164E49] text-white font-semibold py-3 rounded-2xl active:scale-95 transition-transform">Add Student</button>
+            </div>
+        </div>
+
+        <!-- FLOATING ADD POINTS POPUP (MODAL) -->
+        <div id="points-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-3xl p-6 w-full max-w-sm text-center relative shadow-xl">
+                <button onclick="closePointsModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+                
+                <span id="selected-student-name" class="block text-[#164E49] text-lg font-bold mb-1">Student Name</span>
+                <div class="w-24 h-24 mx-auto bg-[#F5E6C8] border-2 border-[#C9962E] rounded-full flex flex-col items-center justify-center my-3">
+                    <span id="selected-student-pts" class="text-2xl font-bold text-[#8A6415]">0</span>
+                    <span class="text-xs text-[#8A6415]">points</span>
+                </div>
+                
+                <!-- Add / Subtract Toggle -->
+                <div class="flex bg-[#F1F2F0] p-1 rounded-2xl my-4">
+                    <button id="btn-mode-add" onclick="setMode('add')" class="flex-1 py-2 rounded-xl text-sm font-semibold bg-[#3F9142] text-white">Add</button>
+                    <button id="btn-mode-sub" onclick="setMode('subtract')" class="flex-1 py-2 rounded-xl text-sm font-semibold text-gray-400">Subtract</button>
+                </div>
+
+                <!-- Preset Buttons -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="adjustPoints(10)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+10</button>
+                    <button onclick="adjustPoints(25)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+25</button>
+                    <button onclick="adjustPoints(50)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+50</button>
+                    <button onclick="adjustPoints(100)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+100</button>
+                    <button onclick="adjustPoints(150)" class="preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform">+150</button>
+                    <button onclick="toggleCustom()" class="bg-[#F1F2F0] text-gray-500 py-3 rounded-xl font-bold text-sm">Custom</button>
+                </div>
+
+                <!-- Custom Input -->
+                <div id="custom-input-div" class="hidden mt-3 flex gap-2">
+                    <input id="custom-amount" type="number" placeholder="Amount" class="flex-1 bg-[#F1F2F0] rounded-xl px-4 py-2 text-center focus:outline-none">
+                    <button onclick="applyCustomPoints()" class="bg-[#3F9142] text-white px-4 rounded-xl font-semibold text-sm">Apply</button>
+                </div>
             </div>
         </div>
     </div>
@@ -58,69 +92,200 @@
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 text-sm px-4 py-2 rounded-full shadow-lg bg-[#1B2421] text-white hidden z-50"></div>
 
     <script>
-        // Internal data storage array so it doesn't need external connections to function
+        // Supabase Database Connection Details
+        const SUPABASE_URL = "https://kotfrrazrzjyruvszzyi.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdGZycmF6cnpqeXJ1dnN6enlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNzM5MDEsImV4cCI6MjA5OTY0OTkwMX0.HiqMM4EyJMEL-umLe2N_c89_L9Ws5nfb5nl6BGU_c7Q";
+
+        let supabase = null;
         let students = [];
+        let selectedId = null;
+        let mode = 'add'; 
 
-        function switchTab(tabName) {
-            // Forcefully reset all views
+        window.onload = function() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                fetchData();
+            } catch(e) {
+                showToast("Database link setup error.");
+            }
+        };
+
+        // Switch Navigation Tabs
+        function switchTab(tab) {
             ['tracker', 'leaderboard', 'add'].forEach(t => {
-                document.getElementById('content-' + t).classList.add('hidden');
-                document.getElementById('tab-' + t).className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer";
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer";
             });
-
-            // Activate chosen view
-            document.getElementById('content-' + tabName).classList.remove('hidden');
-            document.getElementById('tab-' + tabName).className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer";
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer";
             
-            if (tabName === 'leaderboard') renderLeaderboard();
+            if (tab === 'leaderboard') renderLeaderboard();
+            if (tab === 'tracker') renderStudentList();
         }
 
-        function addNewStudent() {
-            const input = document.getElementById('new-student-name');
-            const name = input.value.trim();
-            if (!name) return;
+        // Fetch alphabetical records from database
+        async function fetchData() {
+            if (!supabase) return;
+            try {
+                const { data, error } = await supabase
+                    .from('students')
+                    .select('*')
+                    .order('name', { ascending: true });
 
-            // Save locally
-            students.push({ id: Date.now(), name: name, points: 0 });
-            
-            showToast(`${name} added successfully!`);
-            input.value = '';
-            
-            // Update UI components
-            updateDropdown();
-            document.getElementById('member-count').innerText = `${students.length} ${students.length === 1 ? 'person' : 'people'} tracked`;
-            
-            // Auto swap back to points manager
-            switchTab('tracker');
+                if (error) {
+                    showToast("Database locked or setup incomplete.");
+                    return;
+                }
+
+                if (data) {
+                    students = data;
+                    document.getElementById('member-count').innerText = `${students.length} ${students.length === 1 ? 'person' : 'people'} tracked`;
+                    renderStudentList();
+                }
+            } catch (err) {
+                showToast("Network offline connection.");
+            }
         }
 
-        function updateDropdown() {
-            const dropdown = document.getElementById('student-dropdown');
-            if (students.length === 0) {
-                dropdown.innerHTML = `<option value="">-- No Students Registered Yet --</option>`;
+        // Render Alphabetical List with search matching
+        function renderStudentList() {
+            const container = document.getElementById('alphabetical-student-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            // Filter list based on search bar matching string names
+            const filtered = students.filter(s => s.name.toLowerCase().includes(searchVal));
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm mt-8">No matching students found.</div>';
                 return;
             }
-            dropdown.innerHTML = students.map(s => `<option value="${s.id}">${s.name} (${s.points} pts)</option>`).join('');
+
+            filtered.forEach(s => {
+                container.innerHTML += `
+                    <div class="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-gray-100">
+                        <div>
+                            <p class="font-bold text-lg text-[#1B2421]">${s.name}</p>
+                            <p class="text-xs text-[#8A6415] bg-[#F5E6C8] px-2 py-0.5 rounded-full inline-block font-bold mt-1">${s.points.toLocaleString()} pts</p>
+                        </div>
+                        <!-- FLOATING PLUS BUTTON CIRCLE BRING BACK -->
+                        <button onclick="openPointsModal(${s.id})" class="w-12 h-12 bg-[#164E49] hover:bg-[#1f635d] text-white font-bold rounded-full flex items-center justify-center text-xl shadow-md active:scale-90 transition-transform">
+                            +
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        // Floating Modal Management
+        function openPointsModal(id) {
+            selectedId = id;
+            const student = students.find(s => s.id === selectedId);
+            if (!student) return;
+
+            document.getElementById('selected-student-name').innerText = student.name;
+            document.getElementById('selected-student-pts').innerText = student.points.toLocaleString();
+            setMode('add'); // default back to adding mode layout style
+            document.getElementById('custom-input-div').classList.add('hidden');
+            document.getElementById('points-modal').classList.remove('hidden');
+        }
+
+        function closePointsModal() {
+            document.getElementById('points-modal').classList.add('hidden');
+            selectedId = null;
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            const isAdd = mode === 'add';
+            document.getElementById('btn-mode-add').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${isAdd ? 'bg-[#3F9142] text-white' : 'text-gray-400'}`;
+            document.getElementById('btn-mode-sub').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${!isAdd ? 'bg-[#C1543C] text-white' : 'text-gray-400'}`;
+            
+            document.querySelectorAll('.preset-btn').forEach((btn, index) => {
+                const values = [10, 25, 50, 100, 150];
+                btn.innerText = `${isAdd ? '+' : '-'}${values[index]}`;
+                btn.className = isAdd 
+                    ? 'preset-btn bg-[#E8F3E8] text-[#2C6B2F] py-3 rounded-xl font-bold active:scale-95 transition-transform' 
+                    : 'preset-btn bg-[#FBEAE6] text-[#93402E] py-3 rounded-xl font-bold active:scale-95 transition-transform';
+            });
+        }
+
+        async function adjustPoints(amount) {
+            if (!selectedId) return;
+            const student = students.find(s => s.id === selectedId);
+            const delta = mode === 'add' ? amount : -amount;
+            const newPoints = Math.max(0, student.points + delta);
+
+            const { error } = await supabase
+                .from('students')
+                .update({ points: newPoints })
+                .eq('id', selectedId);
+
+            if (!error) {
+                showToast(`${mode === 'add' ? '+' : '-'}${amount} points applied!`);
+                // Update internal states cleanly
+                student.points = newPoints;
+                document.getElementById('selected-student-pts').innerText = newPoints.toLocaleString();
+                fetchData(); // Sync list data instantly
+            } else {
+                showToast("Failed to save changes.");
+            }
+        }
+
+        function toggleCustom() {
+            document.getElementById('custom-input-div').classList.toggle('hidden');
+        }
+
+        async function applyCustomPoints() {
+            const amountInput = document.getElementById('custom-amount');
+            const val = parseInt(amountInput.value);
+            if (!val || val <= 0) return;
+            await adjustPoints(val);
+            amountInput.value = '';
+            document.getElementById('custom-input-div').classList.add('hidden');
+        }
+
+        async function addNewStudent() {
+            const nameInput = document.getElementById('new-student-name');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            const { error } = await supabase
+                .from('students')
+                .insert([{ name, points: 0 }]);
+
+            if (!error) {
+                showToast(`${name} registered!`);
+                nameInput.value = '';
+                await fetchData();
+                switchTab('tracker');
+            } else {
+                showToast("Error adding student profile.");
+            }
         }
 
         function renderLeaderboard() {
             const container = document.getElementById('content-leaderboard');
-            if (students.length === 0) {
-                container.innerHTML = `<div class="bg-white p-6 rounded-3xl shadow-sm text-center text-gray-400">No data loaded yet.</div>`;
+            container.innerHTML = '';
+            const sorted = [...students].sort((a, b) => b.points - a.points);
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm mt-8">No leaderboard stats yet.</div>';
                 return;
             }
-            let html = '';
-            [...students].sort((a,b) => b.points - a.points).forEach((s, i) => {
-                html += `
-                    <div class="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm mb-2">
+
+            sorted.forEach((s, i) => {
+                container.innerHTML += `
+                    <div class="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm">
                         <div class="flex items-center gap-3">
-                            <span class="font-bold text-[#164E49]">#${i + 1}</span>
+                            <span class="font-bold text-[#164E49] w-6">#${i + 1}</span>
                             <span class="font-medium">${s.name}</span>
                         </div>
-                        <span class="bg-[#F5E6C8] text-[#8A6415] rounded-full px-3 py-1 text-xs font-bold">${s.points} pts</span>
-                    </div>`;
+                        <span class="bg-[#F5E6C8] text-[#8A6415] rounded-full px-3 py-1 text-xs font-bold">${s.points.toLocaleString()} pts</span>
+                    </div>
+                `;
             });
-            container.innerHTML = html;
         }
 
         function showToast(msg) {
@@ -132,3 +297,5 @@
     </script>
 </body>
 </html>
+
+```
