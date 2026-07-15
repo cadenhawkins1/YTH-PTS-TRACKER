@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,7 +25,7 @@
             <input id="search-input" oninput="renderStudentList()" type="text" placeholder="Search names..." class="w-full mt-4 rounded-2xl px-4 py-3 text-sm text-[#1B2421] focus:outline-none">
         </div>
 
-        <!-- Navigation Tabs -->
+        <!-- Navigation Tabs (Completely isolated click handlers) -->
         <div class="flex justify-around my-4 px-4 bg-white py-2 shadow-sm rounded-xl mx-2">
             <button onclick="switchTab('tracker')" id="tab-tracker" class="font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer">Points</button>
             <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer">Leaderboard</button>
@@ -92,7 +91,26 @@
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 text-sm px-4 py-2 rounded-full shadow-lg bg-[#1B2421] text-white hidden z-50"></div>
 
     <script>
-        // Supabase Database Connection Details
+        // Tab Navigation Setup (Runs clean even if database connection errors)
+        function switchTab(tab) {
+            const tabsList = ['tracker', 'leaderboard', 'add'];
+            tabsList.forEach(t => {
+                const contentEl = document.getElementById(`content-${t}`);
+                const tabEl = document.getElementById(`tab-${t}`);
+                if (contentEl) contentEl.classList.add('hidden');
+                if (tabEl) tabEl.className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer";
+            });
+            
+            const targetContent = document.getElementById(`content-${tab}`);
+            const targetTab = document.getElementById(`tab-${tab}`);
+            if (targetContent) targetContent.classList.remove('hidden');
+            if (targetTab) targetTab.className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer";
+            
+            if (tab === 'leaderboard') renderLeaderboard();
+            if (tab === 'tracker') renderStudentList();
+        }
+
+        // Supabase Database Config
         const SUPABASE_URL = "https://kotfrrazrzjyruvszzyi.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdGZycmF6cnpqeXJ1dnN6enlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNzM5MDEsImV4cCI6MjA5OTY0OTkwMX0.HiqMM4EyJMEL-umLe2N_c89_L9Ws5nfb5nl6BGU_c7Q";
 
@@ -102,28 +120,22 @@
         let mode = 'add'; 
 
         window.onload = function() {
+            // Safe initialize inside a try block so it never crashes the page layout execution
             try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                fetchData();
+                if (window.supabase && typeof window.supabase.createClient === 'function') {
+                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                    fetchData();
+                } else {
+                    showToast("Database client missing. Local display active.");
+                    renderStudentList();
+                }
             } catch(e) {
-                showToast("Database link setup error.");
+                console.error(e);
+                renderStudentList();
             }
         };
 
-        // Switch Navigation Tabs
-        function switchTab(tab) {
-            ['tracker', 'leaderboard', 'add'].forEach(t => {
-                document.getElementById(`content-${t}`).classList.add('hidden');
-                document.getElementById(`tab-${t}`).className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer";
-            });
-            document.getElementById(`content-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-${tab}`).className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer";
-            
-            if (tab === 'leaderboard') renderLeaderboard();
-            if (tab === 'tracker') renderStudentList();
-        }
-
-        // Fetch alphabetical records from database
+        // Fetch alphabetical records safely
         async function fetchData() {
             if (!supabase) return;
             try {
@@ -133,7 +145,8 @@
                     .order('name', { ascending: true });
 
                 if (error) {
-                    showToast("Database locked or setup incomplete.");
+                    showToast("Database connected but table setup missing.");
+                    renderStudentList();
                     return;
                 }
 
@@ -143,7 +156,8 @@
                     renderStudentList();
                 }
             } catch (err) {
-                showToast("Network offline connection.");
+                showToast("Connection offline backup active.");
+                renderStudentList();
             }
         }
 
@@ -154,7 +168,6 @@
             container.innerHTML = '';
 
             const searchVal = document.getElementById('search-input').value.toLowerCase();
-            // Filter list based on search bar matching string names
             const filtered = students.filter(s => s.name.toLowerCase().includes(searchVal));
 
             if (filtered.length === 0) {
@@ -186,7 +199,7 @@
 
             document.getElementById('selected-student-name').innerText = student.name;
             document.getElementById('selected-student-pts').innerText = student.points.toLocaleString();
-            setMode('add'); // default back to adding mode layout style
+            setMode('add');
             document.getElementById('custom-input-div').classList.add('hidden');
             document.getElementById('points-modal').classList.remove('hidden');
         }
@@ -217,6 +230,11 @@
             const delta = mode === 'add' ? amount : -amount;
             const newPoints = Math.max(0, student.points + delta);
 
+            if (!supabase) {
+                showToast("Running offline mode. Setup Supabase to save changes.");
+                return;
+            }
+
             const { error } = await supabase
                 .from('students')
                 .update({ points: newPoints })
@@ -224,10 +242,9 @@
 
             if (!error) {
                 showToast(`${mode === 'add' ? '+' : '-'}${amount} points applied!`);
-                // Update internal states cleanly
                 student.points = newPoints;
                 document.getElementById('selected-student-pts').innerText = newPoints.toLocaleString();
-                fetchData(); // Sync list data instantly
+                fetchData();
             } else {
                 showToast("Failed to save changes.");
             }
@@ -251,6 +268,11 @@
             const name = nameInput.value.trim();
             if (!name) return;
 
+            if (!supabase) {
+                showToast("Offline mode. Add table in dashboard to register students.");
+                return;
+            }
+
             const { error } = await supabase
                 .from('students')
                 .insert([{ name, points: 0 }]);
@@ -261,7 +283,7 @@
                 await fetchData();
                 switchTab('tracker');
             } else {
-                showToast("Error adding student profile.");
+                showToast("Error adding profile. Check Supabase table configurations.");
             }
         }
 
@@ -290,6 +312,7 @@
 
         function showToast(msg) {
             const toast = document.getElementById('toast');
+            if (!toast) return;
             toast.innerText = msg;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 2500);
@@ -297,5 +320,3 @@
     </script>
 </body>
 </html>
-
-```
