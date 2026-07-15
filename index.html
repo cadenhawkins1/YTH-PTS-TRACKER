@@ -6,7 +6,7 @@
     <title>Youth Points Tracker</title>
     <!-- Tailwind CSS & Google Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght=500;700&display=swap" rel="stylesheet">
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -26,9 +26,9 @@
 
         <!-- Navigation Tabs -->
         <div class="flex justify-around my-4 px-4">
-            <button onclick="switchTab('tracker')" id="tab-tracker" class="font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49]">Points</button>
-            <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="font-bold border-b-2 border-transparent pb-1 text-gray-400">Leaderboard</button>
-            <button onclick="switchTab('add')" id="tab-add" class="font-bold border-b-2 border-transparent pb-1 text-gray-400">Add Student</button>
+            <button onclick="switchTab('tracker')" id="tab-tracker" class="font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] py-2 px-4 cursor-pointer">Points</button>
+            <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="font-bold border-b-2 border-transparent pb-1 text-gray-400 py-2 px-4 cursor-pointer">Leaderboard</button>
+            <button onclick="switchTab('add')" id="tab-add" class="font-bold border-b-2 border-transparent pb-1 text-gray-400 py-2 px-4 cursor-pointer">Add Student</button>
         </div>
 
         <!-- Tab Content 1: Points Tracker -->
@@ -83,76 +83,78 @@
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 text-sm px-4 py-2 rounded-full shadow-lg bg-[#1B2421] text-white hidden z-50"></div>
 
     <script>
-        // Supabase Database Connection
+        // Simple Tab Changer (Completely isolated from database setup)
+        function switchTab(tab) {
+            const tabs = ['tracker', 'leaderboard', 'add'];
+            
+            tabs.forEach(t => {
+                const contentBlock = document.getElementById('content-' + t);
+                const tabButton = document.getElementById('tab-' + t);
+                
+                if (contentBlock) {
+                    contentBlock.style.setProperty('display', 'none', 'important');
+                    contentBlock.classList.add('hidden');
+                }
+                if (tabButton) {
+                    tabButton.className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 py-2 px-4 cursor-pointer";
+                }
+            });
+
+            const activeContent = document.getElementById('content-' + tab);
+            const activeTab = document.getElementById('tab-' + tab);
+            
+            if (activeContent) {
+                activeContent.style.setProperty('display', 'block', 'important');
+                activeContent.classList.remove('hidden');
+            }
+            if (activeTab) {
+                activeTab.className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] py-2 px-4 cursor-pointer";
+            }
+            
+            if (tab === 'leaderboard') renderLeaderboard();
+        }
+
+        // Supabase Database Setup
         const SUPABASE_URL = "https://kotfrrazrzjyruvszzyi.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdGZycmF6cnpqeXJ1dnN6enlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNzM5MDEsImV4cCI6MjA5OTY0OTkwMX0.HiqMM4EyJMEL-umLe2N_c89_L9Ws5nfb5nl6BGU_c7Q";
 
         let supabase = null;
-        try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        } catch(e) {
-            console.error("Failed to initialize Supabase client library:", e);
-        }
-
         let students = [];
         let selectedId = null;
         let mode = 'add'; 
 
         window.onload = function() {
-            fetchData();
+            try {
+                if (window.supabase && typeof window.supabase.createClient === 'function') {
+                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                    fetchData();
+                } else {
+                    showToast("Database plugin missing. Running offline mode.");
+                }
+            } catch (err) {
+                console.error("Initialization error:", err);
+            }
         };
 
-        // Fetch Data Safely without crashing the whole script
         async function fetchData() {
-            if (!supabase) {
-                showToast("Database system client failed to start.");
-                populateDropdown(students);
-                return;
-            }
-
+            if (!supabase) return;
             try {
                 const { data, error } = await supabase
                     .from('students')
                     .select('*')
                     .order('name', { ascending: true });
 
-                if (error) {
-                    console.error("Supabase error message:", error.message);
-                    showToast("Database connected but table is missing or locked.");
-                    populateDropdown(students);
-                    return;
-                }
-
-                if (data) {
+                if (!error && data) {
                     students = data;
-                    document.getElementById('member-count').innerText = `${students.length} ${students.length === 1 ? 'person' : 'people'} tracked`;
+                    const countEl = document.getElementById('member-count');
+                    if (countEl) countEl.innerText = `${students.length} ${students.length === 1 ? 'person' : 'people'} tracked`;
                     populateDropdown(students);
                 }
             } catch (err) {
-                console.error("Network or script error during fetch:", err);
-                showToast("Database error. Screen unlocked for offline testing.");
-                populateDropdown(students);
+                console.error("Fetch crash prevented:", err);
             }
         }
 
-        // Tab Navigation (Now completely bulletproof)
-        function switchTab(tab) {
-            ['tracker', 'leaderboard', 'add'].forEach(t => {
-                const contentEl = document.getElementById(`content-${t}`);
-                const tabEl = document.getElementById(`tab-${t}`);
-                if (contentEl) contentEl.classList.add('hidden');
-                if (tabEl) tabEl.className = "font-bold border-b-2 border-transparent pb-1 text-gray-400";
-            });
-
-            const activeContent = document.getElementById(`content-${tab}`);
-            const activeTab = document.getElementById(`tab-${tab}`);
-            if (activeContent) activeContent.classList.remove('hidden');
-            if (activeTab) activeTab.className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49]";
-            
-            if (tab === 'leaderboard') renderLeaderboard();
-        }
-
-        // Dropdown Handling
         function populateDropdown(listToRender) {
             const dropdown = document.getElementById('student-dropdown');
             if (!dropdown) return;
@@ -173,7 +175,9 @@
         }
 
         function selectStudent() {
-            selectedId = parseInt(document.getElementById('student-dropdown').value);
+            const drop = document.getElementById('student-dropdown');
+            if (!drop) return;
+            selectedId = parseInt(drop.value);
             const card = document.getElementById('points-display-card');
             if (!card) return;
             if (!selectedId) {
@@ -210,7 +214,7 @@
             const newPoints = Math.max(0, student.points + delta);
 
             if (!supabase) {
-                showToast("Cannot update: Running in offline backup mode.");
+                showToast("Offline mode: changes cannot save.");
                 return;
             }
 
@@ -223,7 +227,7 @@
                 showToast(`${mode === 'add' ? '+' : '-'}${amount} points applied to ${student.name}`);
                 fetchData();
             } else {
-                showToast("Failed to save points to database!");
+                showToast("Failed to save changes.");
             }
         }
 
@@ -249,7 +253,7 @@
             if (!name) return;
 
             if (!supabase) {
-                showToast("Cannot add student: Running in offline backup mode.");
+                showToast("Offline mode: cannot add student.");
                 return;
             }
 
@@ -258,12 +262,10 @@
                 .insert([{ name, points: 0 }]);
 
             if (!error) {
-                showToast(`${name} registered!`);
+                showToast(`${name} added!`);
                 nameInput.value = '';
                 await fetchData();
                 switchTab('tracker');
-            } else {
-                alert("Could not add student. Check your Supabase table name and RLS settings.");
             }
         }
 
@@ -273,7 +275,7 @@
             container.innerHTML = '';
             
             if (students.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-400 text-sm mt-4">No student data loaded yet.</div>';
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm mt-4">No data loaded.</div>';
                 return;
             }
 
@@ -296,7 +298,7 @@
             if (!toast) return;
             toast.innerText = msg;
             toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 3500);
+            setTimeout(() => toast.classList.add('hidden'), 3000);
         }
     </script>
 </body>
