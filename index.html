@@ -21,11 +21,12 @@
         <div class="bg-[#164E49] text-white rounded-b-3xl px-5 pb-6 pt-8 shadow-md">
             <h1 class="text-2xl font-bold">Youth Points</h1>
             <p id="member-count" class="text-sm text-[#9FC4BF] mt-0.5">0 people tracked</p>
+            
             <!-- Search Bar -->
             <input id="search-input" oninput="renderStudentList()" type="text" placeholder="Search names..." class="w-full mt-4 rounded-2xl px-4 py-3 text-sm text-[#1B2421] focus:outline-none">
         </div>
 
-        <!-- Navigation Tabs (Completely isolated click handlers) -->
+        <!-- Navigation Tabs -->
         <div class="flex justify-around my-4 px-4 bg-white py-2 shadow-sm rounded-xl mx-2">
             <button onclick="switchTab('tracker')" id="tab-tracker" class="font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer">Points</button>
             <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer">Leaderboard</button>
@@ -35,7 +36,7 @@
         <!-- Tab Content 1: Alphabetical Student List -->
         <div id="content-tracker" class="px-5 space-y-2">
             <div id="alphabetical-student-list" class="space-y-2">
-                <!-- Students inject here alphabetically -->
+                <!-- Students load here alphabetically -->
             </div>
         </div>
 
@@ -51,7 +52,7 @@
             </div>
         </div>
 
-        <!-- FLOATING ADD POINTS POPUP (MODAL) -->
+        <!-- FLOATING ADD POINTS MODAL (Your old point system look) -->
         <div id="points-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
             <div class="bg-white rounded-3xl p-6 w-full max-w-sm text-center relative shadow-xl">
                 <button onclick="closePointsModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
@@ -91,26 +92,23 @@
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 text-sm px-4 py-2 rounded-full shadow-lg bg-[#1B2421] text-white hidden z-50"></div>
 
     <script>
-        // Tab Navigation Setup (Runs clean even if database connection errors)
+        // Tab Navigation (Completely independent, will never freeze)
         function switchTab(tab) {
-            const tabsList = ['tracker', 'leaderboard', 'add'];
-            tabsList.forEach(t => {
-                const contentEl = document.getElementById(`content-${t}`);
-                const tabEl = document.getElementById(`tab-${t}`);
-                if (contentEl) contentEl.classList.add('hidden');
-                if (tabEl) tabEl.className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer";
+            ['tracker', 'leaderboard', 'add'].forEach(t => {
+                const contentBlock = document.getElementById(`content-${t}`);
+                const tabBtn = document.getElementById(`tab-${t}`);
+                if (contentBlock) contentBlock.classList.add('hidden');
+                if (tabBtn) tabBtn.className = "font-bold border-b-2 border-transparent pb-1 text-gray-400 px-4 py-2 cursor-pointer";
             });
             
-            const targetContent = document.getElementById(`content-${tab}`);
-            const targetTab = document.getElementById(`tab-${tab}`);
-            if (targetContent) targetContent.classList.remove('hidden');
-            if (targetTab) targetTab.className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer";
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).className = "font-bold border-b-2 border-[#164E49] pb-1 text-[#164E49] px-4 py-2 cursor-pointer";
             
             if (tab === 'leaderboard') renderLeaderboard();
             if (tab === 'tracker') renderStudentList();
         }
 
-        // Supabase Database Config
+        // Supabase Credentials
         const SUPABASE_URL = "https://kotfrrazrzjyruvszzyi.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdGZycmF6cnpqeXJ1dnN6enlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNzM5MDEsImV4cCI6MjA5OTY0OTkwMX0.HiqMM4EyJMEL-umLe2N_c89_L9Ws5nfb5nl6BGU_c7Q";
 
@@ -120,22 +118,20 @@
         let mode = 'add'; 
 
         window.onload = function() {
-            // Safe initialize inside a try block so it never crashes the page layout execution
             try {
                 if (window.supabase && typeof window.supabase.createClient === 'function') {
                     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                     fetchData();
                 } else {
-                    showToast("Database client missing. Local display active.");
+                    showToast("Database library failing to load.");
                     renderStudentList();
                 }
             } catch(e) {
-                console.error(e);
                 renderStudentList();
             }
         };
 
-        // Fetch alphabetical records safely
+        // Fetch records alphabetically
         async function fetchData() {
             if (!supabase) return;
             try {
@@ -145,8 +141,7 @@
                     .order('name', { ascending: true });
 
                 if (error) {
-                    showToast("Database connected but table setup missing.");
-                    renderStudentList();
+                    showToast("Database table setup required in Supabase.");
                     return;
                 }
 
@@ -156,12 +151,11 @@
                     renderStudentList();
                 }
             } catch (err) {
-                showToast("Connection offline backup active.");
                 renderStudentList();
             }
         }
 
-        // Render Alphabetical List with search matching
+        // Render Alphabetical List + Search
         function renderStudentList() {
             const container = document.getElementById('alphabetical-student-list');
             if (!container) return;
@@ -182,7 +176,7 @@
                             <p class="font-bold text-lg text-[#1B2421]">${s.name}</p>
                             <p class="text-xs text-[#8A6415] bg-[#F5E6C8] px-2 py-0.5 rounded-full inline-block font-bold mt-1">${s.points.toLocaleString()} pts</p>
                         </div>
-                        <!-- FLOATING PLUS BUTTON CIRCLE BRING BACK -->
+                        <!-- THE FLOATING CIRCLE PLUS BUTTON -->
                         <button onclick="openPointsModal(${s.id})" class="w-12 h-12 bg-[#164E49] hover:bg-[#1f635d] text-white font-bold rounded-full flex items-center justify-center text-xl shadow-md active:scale-90 transition-transform">
                             +
                         </button>
@@ -191,7 +185,7 @@
             });
         }
 
-        // Floating Modal Management
+        // Point Popup Panel controls
         function openPointsModal(id) {
             selectedId = id;
             const student = students.find(s => s.id === selectedId);
@@ -230,11 +224,6 @@
             const delta = mode === 'add' ? amount : -amount;
             const newPoints = Math.max(0, student.points + delta);
 
-            if (!supabase) {
-                showToast("Running offline mode. Setup Supabase to save changes.");
-                return;
-            }
-
             const { error } = await supabase
                 .from('students')
                 .update({ points: newPoints })
@@ -246,7 +235,7 @@
                 document.getElementById('selected-student-pts').innerText = newPoints.toLocaleString();
                 fetchData();
             } else {
-                showToast("Failed to save changes.");
+                showToast("Error updating database rows.");
             }
         }
 
@@ -268,11 +257,6 @@
             const name = nameInput.value.trim();
             if (!name) return;
 
-            if (!supabase) {
-                showToast("Offline mode. Add table in dashboard to register students.");
-                return;
-            }
-
             const { error } = await supabase
                 .from('students')
                 .insert([{ name, points: 0 }]);
@@ -283,7 +267,7 @@
                 await fetchData();
                 switchTab('tracker');
             } else {
-                showToast("Error adding profile. Check Supabase table configurations.");
+                showToast("Error inserting into table rows.");
             }
         }
 
@@ -312,10 +296,11 @@
 
         function showToast(msg) {
             const toast = document.getElementById('toast');
-            if (!toast) return;
-            toast.innerText = msg;
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 2500);
+            if (toast) {
+                toast.innerText = msg;
+                toast.classList.remove('hidden');
+                setTimeout(() => toast.classList.add('hidden'), 2500);
+            }
         }
     </script>
 </body>
