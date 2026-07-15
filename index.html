@@ -15,18 +15,8 @@
 </head>
 <body class="min-h-screen text-[#1B2421] pb-24">
 
-    <!-- PASSWORD LOGIN GATE -->
-    <div id="login-screen" class="fixed inset-0 bg-[#F4F5F1] z-50 flex flex-col items-center justify-center p-6">
-        <div class="bg-white p-8 rounded-3xl shadow-md w-full max-w-sm text-center">
-            <h1 class="text-2xl text-[#164E49] font-bold mb-2">Youth Points Log In</h1>
-            <p class="text-xs text-gray-500 mb-6">Enter password to access tracking</p>
-            <input id="password-input" type="password" inputmode="numeric" placeholder="Enter Password" class="w-full bg-[#F1F2F0] rounded-2xl px-4 py-3 mb-4 text-center text-xl tracking-widest focus:outline-none focus:ring-2 focus:ring-[#164E49]">
-            <button onclick="checkPassword()" class="w-full text-white bg-[#164E49] font-semibold rounded-2xl py-3 active:scale-95 transition-transform">Enter</button>
-        </div>
-    </div>
-
-    <!-- MAIN APP SCREEN (HIDDEN BY DEFAULT) -->
-    <div id="app-screen" class="hidden max-w-md mx-auto">
+    <!-- MAIN APP SCREEN (OPENS IMMEDIATELY) -->
+    <div id="app-screen" class="max-w-md mx-auto">
         <!-- Header -->
         <div class="bg-[#164E49] text-white rounded-b-3xl px-5 pb-6 pt-8 shadow-md">
             <h1 class="text-2xl font-bold">Youth Points</h1>
@@ -93,7 +83,7 @@
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 text-sm px-4 py-2 rounded-full shadow-lg bg-[#1B2421] text-white hidden z-50"></div>
 
     <script>
-        // Connected directly to your Supabase Cloud Database!
+        // Supabase Database Connection
         const SUPABASE_URL = "https://kotfrrazrzjyruvszzyi.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdGZycmF6cnpqeXJ1dnN6enlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNzM5MDEsImV4cCI6MjA5OTY0OTkwMX0.HiqMM4EyJMEL-umLe2N_c89_L9Ws5nfb5nl6BGU_c7Q";
 
@@ -102,33 +92,32 @@
         let selectedId = null;
         let mode = 'add'; // 'add' or 'subtract'
 
-        // 1. Password Protection
-        function checkPassword() {
-            const pwd = document.getElementById('password-input').value;
-            if (pwd === "WAY-YTH") {
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('app-screen').classList.remove('hidden');
-                fetchData();
-            } else {
-                alert("Incorrect Password!");
-            }
-        }
+        // Load data immediately on startup
+        window.onload = function() {
+            fetchData();
+        };
 
-        // 2. Fetch Data from Supabase Cloud
+        // Fetch Data from Supabase Cloud
         async function fetchData() {
             const { data, error } = await supabase
                 .from('students')
                 .select('*')
                 .order('name', { ascending: true });
 
-            if (!error && data) {
+            if (error) {
+                console.error("Database error:", error.message);
+                showToast("Database connection error!");
+                return;
+            }
+
+            if (data) {
                 students = data;
                 document.getElementById('member-count').innerText = `${students.length} ${students.length === 1 ? 'person' : 'people'} tracked`;
                 populateDropdown(students);
             }
         }
 
-        // 3. Tab Navigation
+        // Tab Navigation
         function switchTab(tab) {
             ['tracker', 'leaderboard', 'add'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
@@ -139,7 +128,7 @@
             if (tab === 'leaderboard') renderLeaderboard();
         }
 
-        // 4. Dropdown Handling
+        // Dropdown Handling
         function populateDropdown(listToRender) {
             const dropdown = document.getElementById('student-dropdown');
             dropdown.innerHTML = `<option value="">-- Select a Student --</option>`;
@@ -171,14 +160,13 @@
             card.classList.remove('hidden');
         }
 
-        // 5. Add / Subtract Point Logic
+        // Add / Subtract Point Logic
         function setMode(newMode) {
             mode = newMode;
             const isAdd = mode === 'add';
             document.getElementById('btn-mode-add').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${isAdd ? 'bg-[#3F9142] text-white' : 'text-gray-400'}`;
             document.getElementById('btn-mode-sub').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${!isAdd ? 'bg-[#C1543C] text-white' : 'text-gray-400'}`;
             
-            // Update preset button prefixes
             document.querySelectorAll('.preset-btn').forEach((btn, index) => {
                 const values = [10, 25, 50, 100, 150];
                 btn.innerText = `${isAdd ? '+' : '-'}${values[index]}`;
@@ -202,10 +190,11 @@
             if (!error) {
                 showToast(`${mode === 'add' ? '+' : '-'}${amount} points applied to ${student.name}`);
                 fetchData();
+            } else {
+                showToast("Failed to save points!");
             }
         }
 
-        // Custom Points Toggle
         function toggleCustom() {
             const div = document.getElementById('custom-input-div');
             div.classList.toggle('hidden');
@@ -220,7 +209,7 @@
             document.getElementById('custom-input-div').classList.add('hidden');
         }
 
-        // 6. Add New Student
+        // Add New Student
         async function addNewStudent() {
             const nameInput = document.getElementById('new-student-name');
             const name = nameInput.value.trim();
@@ -233,14 +222,14 @@
             if (!error) {
                 showToast(`${name} registered!`);
                 nameInput.value = '';
-                fetchData();
+                await fetchData();
                 switchTab('tracker');
             } else {
-                alert("Student already exists or database error.");
+                alert("Could not add student. Check if they already exist or if database RLS is blocking access.");
             }
         }
 
-        // 7. Render Leaderboard List
+        // Render Leaderboard List
         function renderLeaderboard() {
             const container = document.getElementById('content-leaderboard');
             container.innerHTML = '';
@@ -265,7 +254,6 @@
             toast.innerText = msg;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 2000);
-            
         }
     </script>
 </body>
